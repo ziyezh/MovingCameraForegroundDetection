@@ -81,19 +81,21 @@ def main(config: argparse.Namespace) -> None:
         cap.write(f'{cap.filename}_result', res, pano.shape[1], pano.shape[0])
 
         res = get_video_cache(f'{cap.filename}_result.mp4')
-        print(
-            'Draw a line to indicate the direction of camera motion and press q to leave'
-        )
-        camera = DrawLineWidget(pano, res)
-        while True:
-            cv2.imshow(camera.window_name, camera.show_image())
-            key = cv2.waitKey(1)
-            if key == ord('q'):
-                cv2.destroyWindow(camera.window_name)
-                break
-        out2 = cap.createNewCamera(pano, res, camera.image_coordinates[0],
-                                   camera.image_coordinates[1],
-                                   (config.width, config.height))
+        # print(
+        #     'Draw a line to indicate the direction of camera motion and press q to leave'
+        # )
+        # camera = DrawLineWidget(pano, res)
+        # while True:
+        #     cv2.imshow(camera.window_name, camera.show_image())
+        #     key = cv2.waitKey(1)
+        #     if key == ord('q'):
+        #         cv2.destroyWindow(camera.window_name)
+        #         break
+        # out2 = cap.createNewCamera(pano, res, camera.image_coordinates[0],
+        #                            camera.image_coordinates[1],
+        #                            (config.width, config.height))
+        print(pano.shape)
+        out2 = cap.createNewCamera(pano, res, (0, pano.shape[0] / 2), (pano.shape[1], pano.shape[0] / 2), (config.width, config.height))
         cap.write(f'{cap.filename}_out2', out2, config.width, config.height)
 
         print("Creating output3...")
