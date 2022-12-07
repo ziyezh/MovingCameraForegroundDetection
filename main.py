@@ -13,6 +13,8 @@ from panorama.draw_line import DrawLineWidget
 
 panoramas = []
 
+inputPath = "input"
+outputPath = "output"
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -21,26 +23,23 @@ def parse_args():
     parser.add_argument("-bs", "--mv_blocksize", default=16)
     parser.add_argument("-k", "--mv_k", default=16)
     parser.add_argument("-th", "--mv_threshold", default=15)
-    parser.add_argument("-c",
-                        "--clear",
-                        action=argparse.BooleanOptionalAction,
-                        default=False)
-    parser.add_argument("-a",
-                        "--automatic",
-                        action=argparse.BooleanOptionalAction,
-                        default=False)
 
     parser.add_argument("-dw", "--width", default=640)
     parser.add_argument("-dh", "--height", default=480)
+
+    parser.add_argument("-r",
+                        "--right",
+                        action=argparse.BooleanOptionalAction,
+                        default=False)
 
     return parser.parse_args()
 
 
 def get_video_cache(filename: str) -> np.ndarray:
-    cap = cv2.VideoCapture(filename)
+    capture = cv2.VideoCapture(filename)
     frames = []
-    while (cap.isOpened()):
-        ret, frame = cap.read()
+    while (capture.isOpened()):
+        ret, frame = capture.read()
         if ret is True:
             frames.append(frame)
         else:
@@ -51,16 +50,19 @@ def get_video_cache(filename: str) -> np.ndarray:
 
 def main(config: argparse.Namespace) -> None:
     with Video(config.filepath) as cap:
-        if config.clear:
-            print('Clearing file cache...')
-            for f in glob.glob(f"{cap.filename}_*"):
-                os.remove(f)
+        if not os.path.exists(outputPath):
+            print("Created output folder.")   
+            # Create a new directory because it does not exist
+            os.makedirs(outputPath)
+        for f in os.listdir(outputPath):
+            # Clear cache file
+            os.remove(os.path.join(outputPath, f))
 
         fg, bg, fgmasks = cap.extract_foreground(config.fgmode, config)
-        cap.write(f'{cap.filename}_fg', fg, cap.width, cap.height)
+        cap.write(f"{outputPath}/{cap.filename}_fg", fg, cap.width, cap.height)
         # fg = get_video_cache(f'{cap.filename}_fg.mp4')
 
-        panoFile = f'{cap.filename}_pano.jpg'
+        panoFile = f"{outputPath}/{cap.filename}_pano.jpg"
         if not os.path.exists(panoFile):
             # remove foreground and fill out the removed part in background
             # this issue involved camera motion, size change, object tracking
@@ -71,18 +73,16 @@ def main(config: argparse.Namespace) -> None:
             sp = StitchPanorama(sampleBG)
             cv2.imwrite(panoFile, sp.simpleStitch())
         else:
-            print('Cached panorama file is used.')
+            print("Cached panorama file is used.")
 
         pano = cv2.imread(panoFile)
-        res, out1, h = cap.mergeForegroundManual(
-            pano, fg) if not config.automatic else cap.mergeForeground(
-                pano, fg)
-        cv2.imwrite(f'{cap.filename}_out1.jpg', out1)
-        cap.write(f'{cap.filename}_result', res, pano.shape[1], pano.shape[0])
+        res, out1, h = cap.mergeForeground(pano, fg)
+        cv2.imwrite(f"{outputPath}/{cap.filename}_out1.jpg", out1)
+        cap.write(f"{outputPath}/{cap.filename}_result", res, pano.shape[1], pano.shape[0])
 
-        res = get_video_cache(f'{cap.filename}_result.mp4')
+        res = get_video_cache(f"{outputPath}/{cap.filename}_result.mp4")
         print(
-            'Draw a line to indicate the direction of camera motion and press q to leave'
+            "Draw a line to indicate the direction of camera motion and press q to leave"
         )
         camera = DrawLineWidget(pano, res)
         while True:
@@ -94,7 +94,7 @@ def main(config: argparse.Namespace) -> None:
         out2 = cap.createNewCamera(pano, res, camera.image_coordinates[0],
                                    camera.image_coordinates[1],
                                    (config.width, config.height))
-        cap.write(f'{cap.filename}_out2', out2, config.width, config.height)
+        cap.write(f'{outputPath}/{cap.filename}_out2', out2, config.width, config.height)
 
         print("Creating output3...")
         obj_remover = ObjectRemover()
@@ -102,7 +102,7 @@ def main(config: argparse.Namespace) -> None:
         bgmasks_removed = np.where((fg_removed < 5), 1, 0).astype('uint8')
         bg_removed = bg * bgmasks_removed
         out3 = bg_removed + fg_removed
-        cap.write(f'{cap.filename}_out3', out3, cap.width, cap.height)
+        cap.write(f'{outputPath}/{cap.filename}_out3', out3, cap.width, cap.height)
 
     cv2.destroyAllWindows()
 
